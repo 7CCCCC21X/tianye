@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8">
+  <title>ambient查询</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 30px;
+      background: #f4f6fa;
+      text-align: center;
+    }
+    textarea {
+      width: 80%;
+      height: 150px;
+    }
+    select {
+      padding: 6px;
+      margin: 10px;
+    }
+    table {
+      width: 90%;
+      margin: 20px auto;
+      border-collapse: collapse;
+      background: white;
+    }
+    th, td {
+      border: 1px solid #ccc;
+      padding: 8px;
+    }
+    th {
+      background-color: #2f3542;
+      color: #fff;
+    }
+    td:nth-child(3) {
+      color: #2ed573;
+      font-weight: bold;
+    }
+    .price-info {
+      margin-top: 20px;
+      font-size: 14px;
+      color: #444;
+      background-color: #dff9fb;
+      display: inline-block;
+      padding: 10px;
+      border-radius: 8px;
+    }
+  </style>
+</head>
+<body>
+  <h1>ambient查询</h1>
+  <p>请输入地址（每行一个）：</p>
+  <textarea id="addressInput"></textarea><br>
+  <label for="chainSelect">选择链：</label>
+  <select id="chainSelect">
+    <option value="swell" selected>Swell</option>
+  </select>
+  <button onclick="startQuery()">开始查询</button>
+
+  <div class="price-info" id="priceInfo" style="display:none">
+    当前汇率：1 USDE = 0.848 sUSDE，1 sUSDE = 1.172 USDE
+  </div>
+
+  <table id="resultTable" style="display:none">
+    <thead>
+      <tr>
+        <th>地址</th>
+        <th>交易次数</th>
+        <th>交易总金额 (USD)</th>
+        <th>最新交易时间</th>
+      </tr>
+    </thead>
+    <tbody id="resultBody"></tbody>
+  </table>
+
+  <script>
+    function toLocalTime(timestamp) {
+      const date = new Date(timestamp * 1000);
+      return date.toLocaleString('zh-CN', { hour12: false });
+    }
+
+    async function startQuery() {
+      const baseToQuote = 0.848; // 1 USDE = 0.848 sUSDE
+      const quoteToBase = 1.172; // 1 sUSDE = 1.172 USDE
+
+      const chain = document.getElementById('chainSelect').value;
+      const addresses = document.getElementById('addressInput').value.trim().split(/\n|\r+/);
+      const resultBody = document.getElementById('resultBody');
+      resultBody.innerHTML = '';
+      document.getElementById('resultTable').style.display = 'table';
+      document.getElementById('priceInfo').style.display = 'block';
+
+      for (const addr of addresses) {
+        const url = `https://ambindexer.net/swell-gcgo/user_pool_txs?user=${addr}&base=0x211cc4dd073734da055fbf44a2b4667d5e5fe5d2&quote=0x5d3a1ff2b6bab83b63cd9ad0787074081a52ef34&poolIdx=420&chainId=0x783&n=200`;
+        try {
+          const res = await fetch(url);
+          const json = await res.json();
+
+          const txs = json.data || [];
+          let baseSent = 0;
+          let quoteSent = 0;
+          let maxTime = 0;
+
+          for (const tx of txs) {
+            const base = Number(tx.baseFlow);
+            const quote = Number(tx.quoteFlow);
+            if (base < 0) baseSent += Math.abs(base);
+            if (quote < 0) quoteSent += Math.abs(quote);
+            maxTime = Math.max(maxTime, tx.txTime);
+          }
+
+          const baseSentUSDE = baseSent / 1e18;
+          const quoteSentUSDE = (quoteSent / 1e18) * quoteToBase; // sUSDE 转换为 USDE
+          const totalSentUSD = baseSentUSDE + quoteSentUSDE;
+
+          const tr = document.createElement('tr');
+          tr.innerHTML = `
+            <td>${addr}</td>
+            <td>${txs.length}</td>
+            <td>$${totalSentUSD.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+            <td>${maxTime !== 0 ? toLocalTime(maxTime) : '-'}</td>
+          `;
+          resultBody.appendChild(tr);
+        } catch (e) {
+          const tr = document.createElement('tr');
+          tr.innerHTML = `<td colspan="4">查询失败: ${addr}</td>`;
+          resultBody.appendChild(tr);
+        }
+      }
+    }
+  </script>
+</body>
+</html>
