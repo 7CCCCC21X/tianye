@@ -53,7 +53,8 @@
   <textarea id="addressInput"></textarea><br>
   <label for="chainSelect">选择链：</label>
   <select id="chainSelect">
-    <option value="swell" selected>Swell</option>
+    <option value="swell">Swell</option>
+    <option value="scroll" selected>Scroll</option>
   </select>
   <button onclick="startQuery()">开始查询</button>
 
@@ -80,8 +81,8 @@
     }
 
     async function startQuery() {
-      const baseToQuote = 0.848; // 1 USDE = 0.848 sUSDE
-      const quoteToBase = 1.172; // 1 sUSDE = 1.172 USDE
+      const baseToQuote = 0.848;
+      const quoteToBase = 1.172;
 
       const chain = document.getElementById('chainSelect').value;
       const addresses = document.getElementById('addressInput').value.trim().split(/\n|\r+/);
@@ -91,12 +92,18 @@
       document.getElementById('priceInfo').style.display = 'block';
 
       for (const addr of addresses) {
-        const url = `https://ambindexer.net/swell-gcgo/user_pool_txs?user=${addr}&base=0x211cc4dd073734da055fbf44a2b4667d5e5fe5d2&quote=0x5d3a1ff2b6bab83b63cd9ad0787074081a52ef34&poolIdx=420&chainId=0x783&n=200`;
+        let url = "";
+        if (chain === "scroll") {
+          url = `https://ambindexer.net/scroll-gcgo/user_txs?user=${addr}&chainId=0x82750&n=200`;
+        } else if (chain === "swell") {
+          url = `https://ambindexer.net/swell-gcgo/user_pool_txs?user=${addr}&base=0x211cc4dd073734da055fbf44a2b4667d5e5fe5d2&quote=0x5d3a1ff2b6bab83b63cd9ad0787074081a52ef34&poolIdx=420&chainId=0x783&n=200`;
+        }
+
         try {
           const res = await fetch(url);
           const json = await res.json();
-
           const txs = json.data || [];
+
           let baseSent = 0;
           let quoteSent = 0;
           let maxTime = 0;
@@ -110,7 +117,7 @@
           }
 
           const baseSentUSDE = baseSent / 1e18;
-          const quoteSentUSDE = (quoteSent / 1e18) * quoteToBase; // sUSDE 转换为 USDE
+          const quoteSentUSDE = (quoteSent / 1e18) * quoteToBase;
           const totalSentUSD = baseSentUSDE + quoteSentUSDE;
 
           const tr = document.createElement('tr');
